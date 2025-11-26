@@ -117,6 +117,9 @@ const SYMBOLS = [
   { id: 'seven3', icon: SevenThreeIcon, color: 'text-red-600', value: 400, weight: 2 }, 
   { id: 'strawberry', icon: StrawberryIcon, color: 'text-red-600', value: 20, weight: 1 }, 
   { id: 'empty', icon: (props) => <CircleDashed {...props} className="text-slate-800 opacity-20" />, color: 'text-slate-700', value: 0, weight: 0 },
+  // Note: 'lemon' ID is used for Banana icon in original code, keeping consistent or renaming if needed.
+  // For Fruit Check: cherry, watermelon, orange, strawberry, lemon(banana) are fruits.
+  { id: 'lemon', icon: Banana, color: 'text-yellow-400', value: 10, weight: 50 }, 
 ];
 
 const BONUS_TARGETS = {
@@ -182,6 +185,7 @@ const globalStyles = `
   .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
 `;
 
+// 롱 프레스 버튼 컴포넌트
 const LongPressButton = ({ onClick, onLongPress, children, disabled, className }) => {
     const timerRef = useRef(null);
     const isLongPress = useRef(false);
@@ -213,7 +217,7 @@ const LongPressButton = ({ onClick, onLongPress, children, disabled, className }
             onTouchStart={startPress}
             onTouchEnd={(e) => { if (e.cancelable) e.preventDefault(); endPress(); }} 
             disabled={disabled}
-            className={`${className} touch-manipulation`} // 터치 최적화
+            className={`${className} touch-manipulation`} 
         >
             {children}
         </button>
@@ -262,7 +266,6 @@ export default function App() {
       setBet(prev => {
           if (prev >= MAX_BET) return prev;
           const next = prev + 1;
-          // Check balance if needed, but arcade style usually allows betting until empty
           if (next > credits + prev) return prev; 
           return next;
       });
@@ -340,13 +343,16 @@ export default function App() {
   const isBar = (id) => ['bar1', 'bar2', 'bar3'].includes(id);
   const isSeven = (id) => ['seven', 'seven3'].includes(id);
 
+  // [NEW] Helper to check if a symbol is a fruit
+  const isFruit = (id) => ['cherry', 'watermelon', 'orange', 'strawberry', 'lemon'].includes(id);
+
   const checkWin = (finalGrid, isBonusRound) => {
     let totalWin = 0;
     const newWinningLines = [];
     let isWin = false;
     let currentSpinStats = { cherryHit: 0, bell3: 0, bar1Hit: false };
     let isAllFruits = false;
-    let allFruitsSymbol = null;
+    let allFruitsSymbol = null; // Not used for mixed fruits but kept for structure
     let hitCenterBonus = false;
 
     WIN_LINES.forEach((line, index) => {
@@ -407,16 +413,32 @@ export default function App() {
         }
     }
 
+    // [UPDATED] All Fruits Check (Mixed Fruits OK)
+    const isAllFruitsMatch = finalGrid.every(idx => isFruit(SYMBOLS[idx].id));
+    
+    // Check All Same (Legacy Logic for Non-Fruits like 9 Bells)
     const firstSymbolId = SYMBOLS[finalGrid[0]].id;
+    let isAllSame = false;
     if (firstSymbolId !== 'empty') {
-        const isAllSame = finalGrid.every(idx => SYMBOLS[idx].id === firstSymbolId);
-        if (isAllSame) {
-            const multiplier = isBonusRound ? 300 : 100;
-            totalWin += bet * multiplier;
-            isAllFruits = true;
-            isWin = true;
-            allFruitsSymbol = firstSymbolId;
-        }
+        isAllSame = finalGrid.every(idx => SYMBOLS[idx].id === firstSymbolId);
+    }
+
+    if (isAllFruitsMatch) {
+         // Mixed Fruits or Same Fruits -> Jackpot Trigger
+         const multiplier = isBonusRound ? 500 : 200; 
+         totalWin += bet * multiplier;
+         isAllFruits = true; 
+         isWin = true;
+    } else if (isAllSame) {
+         // Non-fruit All Same (e.g., All Bells, All Bars)
+         const multiplier = isBonusRound ? 500 : 200;
+         totalWin += bet * multiplier;
+         isWin = true;
+         // Check if it's All Bells for specific jackpot rule? 
+         // User said: "All Fruits" gets jackpot. 
+         // But also previously: "Bell Bonus + All Bells = Jackpot". 
+         // Let's keep Bell Jackpot separate logic in spin().
+         if (firstSymbolId === 'bell') allFruitsSymbol = 'bell';
     }
 
     return { isWin, totalWin, newWinningLines, spinStats: currentSpinStats, isAllFruits, allFruitsSymbol, hitCenterBonus };
@@ -583,6 +605,7 @@ export default function App() {
     playSound('spin');
 
     let forcedAllFruits = false;
+    // [확률 조정] 0.8%
     if (!bonusMode && Math.random() < 0.008) {
         forcedAllFruits = true;
     }
@@ -590,7 +613,11 @@ export default function App() {
     const generateGrid = () => {
         if (forcedAllFruits) {
             const validSymbols = SYMBOLS.filter(s => s.id !== 'empty');
-            const randomSym = validSymbols[Math.floor(Math.random() * validSymbols.length)];
+            // 과일 중에서만 선택 (All Fruits Event) or Any Symbol?
+            // "올 후르츠" event usually implies fruits.
+            // Let's pick a random fruit symbol to fill.
+            const fruitSymbols = SYMBOLS.filter(s => isFruit(s.id));
+            const randomSym = fruitSymbols[Math.floor(Math.random() * fruitSymbols.length)];
             const symIndex = SYMBOLS.findIndex(s => s.id === randomSym.id);
             return Array(9).fill(symIndex);
         }
@@ -621,8 +648,14 @@ export default function App() {
         let isGrandJackpot = false;
 
         if (isWin) {
+            // [수정] 올 후르츠 (Mixed Fruits OK) 이면 잭팟
             if (isAllFruits) {
                 finalWin += jackpotPool; 
+                isGrandJackpot = true;
+            }
+            // Bell Bonus Jackpot Logic (Legacy but valid)
+            else if (bonusMode && bonusType === 'BELL' && allFruitsSymbol === 'bell') {
+                finalWin += jackpotPool;
                 isGrandJackpot = true;
             }
 
@@ -634,10 +667,10 @@ export default function App() {
                 setMessage(`GRAND JACKPOT! ${jackpotPool.toLocaleString()}`);
                 setJackpotPool(INITIAL_JACKPOT); 
                 playSound('jackpot');
-            } else if (isAllFruits) {
+            } else if (isAllFruits) { // Should be caught above, but for safety
                 setCredits(prev => prev + finalWin);
                 setLastWin(finalWin);
-                setMessage("★ ALL MATCH JACKPOT ★");
+                setMessage("★ ALL FRUITS JACKPOT ★");
                 playSound('jackpot');
             } else {
                 if (!autoSpin && !bonusMode) {
@@ -842,7 +875,7 @@ export default function App() {
                       </div>
                   )}
                   
-                  {!cardRevealed && doubleUpStage > 1 && (
+                  {!cardRevealed && (
                       <button onClick={() => collectDoubleUp()} className="mt-6 w-full bg-yellow-600 hover:bg-yellow-500 text-black font-black py-3 rounded-lg uppercase tracking-widest border-b-4 border-yellow-800 active:border-b-0 active:translate-y-1 flex items-center justify-center gap-2">
                           <HandCoins size={20}/> Collect {gambleAmount}
                       </button>
@@ -863,20 +896,23 @@ export default function App() {
         </div>
       </div>
 
-      {/* Rest of the UI: Main Game & Sidebar (No changes here, kept for completeness) */}
-      <div className={`relative bg-slate-800 p-4 md:p-8 rounded-3xl shadow-2xl border-4 max-w-4xl w-full flex flex-col md:flex-row gap-6 transition-all duration-500 ${bonusMode ? (bonusType === 'BAR' ? 'border-cyan-500 shadow-[0_0_50px_rgba(34,211,238,0.5)]' : 'border-red-500 shadow-[0_0_50px_rgba(239,68,68,0.5)]') : 'border-slate-700'}`}>
-        {/* ... Sidebar, Header, Grid, Controls (Same as before) ... */}
+      <div className={`relative bg-slate-800 p-4 md:p-8 rounded-3xl shadow-2xl border-4 max-w-4xl w-full flex flex-col md:flex-row gap-6 transition-all duration-500 
+        ${bonusMode 
+            ? (bonusType === 'BAR' ? 'border-cyan-500 shadow-[0_0_50px_rgba(34,211,238,0.5)]' : 'border-red-500 shadow-[0_0_50px_rgba(239,68,68,0.5)]') 
+            : 'border-slate-700'
+        }`}>
         
         {bonusMode && (
            <div className="absolute -top-12 left-0 w-full text-center animate-bounce z-50">
-               <span className={`text-white font-black text-2xl px-8 py-2 rounded-full border-4 shadow-lg tracking-widest uppercase ${bonusType === 'BAR' ? 'bg-cyan-600 border-white' : 'bg-red-600 border-yellow-400'}`}>
+               <span className={`text-white font-black text-2xl px-8 py-2 rounded-full border-4 shadow-lg tracking-widest uppercase
+                   ${bonusType === 'BAR' ? 'bg-cyan-600 border-white' : 'bg-red-600 border-yellow-400'}
+               `}>
                    {bonusType} BONUS
                </span>
            </div>
         )}
 
         <div className="w-full md:w-64 flex flex-col gap-4 shrink-0">
-            {/* Sidebar Meters */}
             <div className="bg-black/50 p-4 rounded-xl border-2 border-red-900/50 relative overflow-hidden">
                 <Cherry size={48} className="absolute top-2 right-2 text-red-500 opacity-20" />
                 <h3 className="text-red-400 font-black text-lg uppercase italic mb-2">Cherry Bonus</h3>
@@ -913,7 +949,6 @@ export default function App() {
         </div>
 
         <div className="flex-1 flex flex-col relative">
-             {/* Header */}
             <div className={`flex justify-between items-center mb-4 p-3 rounded-lg border transition-colors duration-500 bg-black/60 border-slate-600/50`}>
                 <div>
                     <div className="text-[10px] text-slate-400 font-bold tracking-widest">CREDITS</div>
@@ -931,8 +966,8 @@ export default function App() {
                 </div>
             </div>
 
-             {/* Game Grid */}
             <div className="relative p-6 bg-slate-900 rounded-xl border-4 border-slate-700 shadow-inner mb-4 mx-4 md:mx-0">
+                
                 <LineIndicator lineIdx={1} posClass="left-[-14px] top-[17%]" />
                 <LineIndicator lineIdx={0} posClass="left-[-14px] top-[50%] -translate-y-1/2" />
                 <LineIndicator lineIdx={2} posClass="left-[-14px] bottom-[17%]" />
@@ -977,7 +1012,6 @@ export default function App() {
                 </div>
             </div>
 
-            {/* Controls */}
             <div className="grid grid-cols-4 gap-2 mt-auto">
                 <LongPressButton 
                     onClick={decreaseBet} 
@@ -1052,8 +1086,8 @@ export default function App() {
             <div className="mt-4 p-3 bg-cyan-900/30 border border-cyan-500/30 rounded text-xs text-cyan-200">
                 <p className="font-bold mb-1">UPDATES:</p>
                 <ul className="list-disc pl-4 space-y-1">
+                    <li><strong>All Fruits:</strong> ANY 9 Fruits = JACKPOT!</li>
                     <li><strong>Double Up:</strong> Gamble your winnings!</li>
-                    <li><strong>Cheat Mode:</strong> Click B-L-U-E on title to toggle.</li>
                 </ul>
             </div>
           </div>
