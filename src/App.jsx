@@ -129,10 +129,38 @@ const BONUS_TARGETS = {
 };
 
 const INITIAL_CREDITS = 3000;
-const INITIAL_JACKPOT = 0; 
-const MAX_BET = 64; 
+const INITIAL_JACKPOT = 0;
+const MAX_BET = 64;
 const SPIN_DURATION = 1500;
 const BONUS_SPINS_COUNT = 5;
+
+const STORAGE_KEYS = {
+  JACKPOT: 'ncm_jackpot',
+  STATS: 'ncm_stats',
+};
+
+const loadJackpot = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.JACKPOT);
+    const n = raw == null ? NaN : Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : INITIAL_JACKPOT;
+  } catch {
+    return INITIAL_JACKPOT;
+  }
+};
+
+const DEFAULT_STATS = { spins: 0, wins: 0, largestWin: 0, jackpotCount: 0 };
+
+const loadStats = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.STATS);
+    if (!raw) return DEFAULT_STATS;
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_STATS, ...parsed };
+  } catch {
+    return DEFAULT_STATS;
+  }
+};
 
 // 8 Winning Lines
 const WIN_LINES = [
@@ -186,7 +214,7 @@ const globalStyles = `
 `;
 
 // 롱 프레스 버튼 컴포넌트
-const LongPressButton = ({ onClick, onLongPress, children, disabled, className }) => {
+const LongPressButton = ({ onClick, onLongPress, onLongPressEnd, children, disabled, className }) => {
     const timerRef = useRef(null);
     const isLongPress = useRef(false);
 
@@ -196,7 +224,7 @@ const LongPressButton = ({ onClick, onLongPress, children, disabled, className }
         timerRef.current = setTimeout(() => {
             isLongPress.current = true;
             if (onLongPress) onLongPress();
-        }, 500); 
+        }, 500);
     };
 
     const endPress = () => {
@@ -204,7 +232,9 @@ const LongPressButton = ({ onClick, onLongPress, children, disabled, className }
             clearTimeout(timerRef.current);
             timerRef.current = null;
         }
-        if (!isLongPress.current && !disabled) {
+        if (isLongPress.current) {
+            if (onLongPressEnd) onLongPressEnd();
+        } else if (!disabled) {
             if (onClick) onClick();
         }
     };
@@ -215,9 +245,9 @@ const LongPressButton = ({ onClick, onLongPress, children, disabled, className }
             onMouseUp={endPress}
             onMouseLeave={endPress}
             onTouchStart={startPress}
-            onTouchEnd={(e) => { if (e.cancelable) e.preventDefault(); endPress(); }} 
+            onTouchEnd={(e) => { if (e.cancelable) e.preventDefault(); endPress(); }}
             disabled={disabled}
-            className={`${className} touch-manipulation`} 
+            className={`${className} touch-manipulation`}
         >
             {children}
         </button>
@@ -226,7 +256,7 @@ const LongPressButton = ({ onClick, onLongPress, children, disabled, className }
 
 export default function App() {
   const [credits, setCredits] = useState(INITIAL_CREDITS);
-  const [jackpotPool, setJackpotPool] = useState(INITIAL_JACKPOT);
+  const [jackpotPool, setJackpotPool] = useState(loadJackpot);
   const [bet, setBet] = useState(8);
   const [lastWin, setLastWin] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -253,13 +283,59 @@ export default function App() {
   const [cheatSequence, setCheatSequence] = useState([]); 
   const [celebrationActive, setCelebrationActive] = useState(false); 
 
-  const [stats, setStats] = useState({ spins: 0, wins: 0, largestWin: 0, jackpotCount: 0 });
+  const [stats, setStats] = useState(loadStats);
 
   const animationRef = useRef(null);
-  const bettingIntervalRef = useRef(null); 
+  const bettingIntervalRef = useRef(null);
+  const audioCtxRef = useRef(null);
 
   const playSound = useCallback((type) => {
     if (!soundEnabled) return;
+    try {
+      if (!audioCtxRef.current) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        audioCtxRef.current = new Ctx();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
+
+      const beep = (freq, duration, wave = 'sine', volume = 0.08, delay = 0) => {
+        const t0 = ctx.currentTime + delay;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = wave;
+        osc.frequency.setValueAtTime(freq, t0);
+        gain.gain.setValueAtTime(volume, t0);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + duration);
+      };
+
+      switch (type) {
+        case 'spin':
+          beep(180, 0.08, 'square', 0.04);
+          break;
+        case 'win':
+          beep(523, 0.12, 'sine', 0.09, 0);
+          beep(659, 0.12, 'sine', 0.09, 0.1);
+          beep(784, 0.2, 'sine', 0.09, 0.2);
+          break;
+        case 'jackpot':
+          [523, 659, 784, 988, 1175].forEach((f, i) => beep(f, 0.15, 'square', 0.07, i * 0.08));
+          break;
+        case 'coins':
+          beep(880, 0.05, 'square', 0.06, 0);
+          beep(1320, 0.05, 'square', 0.05, 0.05);
+          break;
+        default:
+          break;
+      }
+    } catch {
+      // AudioContext may not be available; silently ignore.
+    }
   }, [soundEnabled]);
 
   const increaseBet = useCallback(() => {
@@ -727,6 +803,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEYS.JACKPOT, String(jackpotPool)); } catch { /* ignore quota */ }
+  }, [jackpotPool]);
+
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(stats)); } catch { /* ignore quota */ }
+  }, [stats]);
+
+  useEffect(() => {
     if (autoSpin && !isSpinning && !bonusMode && credits >= bet && !doubleUpActive) {
       const timer = setTimeout(spin, 2000);
       return () => clearTimeout(timer);
@@ -1013,13 +1097,11 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-4 gap-2 mt-auto">
-                <LongPressButton 
-                    onClick={decreaseBet} 
+                <LongPressButton
+                    onClick={decreaseBet}
                     onLongPress={startRapidDecrease}
-                    onMouseUp={stopRapidBet}
-                    onMouseLeave={stopRapidBet}
-                    onTouchEnd={stopRapidBet}
-                    disabled={isSpinning || bonusMode || bet === 0 || doubleUpActive} 
+                    onLongPressEnd={stopRapidBet}
+                    disabled={isSpinning || bonusMode || bet === 0 || doubleUpActive}
                     className="bg-slate-700 text-white p-3 rounded font-bold text-xs border-b-4 border-slate-900 active:border-b-0 active:translate-y-1 select-none flex flex-col items-center justify-center leading-none"
                 >
                     <Minus size={16} className="mb-1"/>
@@ -1031,13 +1113,11 @@ export default function App() {
                     <span className="text-xl font-mono font-bold">{bet}</span>
                 </div>
                 
-                <LongPressButton 
-                    onClick={increaseBet} 
-                    onLongPress={startRapidIncrease} 
-                    onMouseUp={stopRapidBet}
-                    onMouseLeave={stopRapidBet}
-                    onTouchEnd={stopRapidBet}
-                    disabled={isSpinning || bonusMode || bet >= MAX_BET || doubleUpActive} 
+                <LongPressButton
+                    onClick={increaseBet}
+                    onLongPress={startRapidIncrease}
+                    onLongPressEnd={stopRapidBet}
+                    disabled={isSpinning || bonusMode || bet >= MAX_BET || doubleUpActive}
                     className="bg-slate-700 text-white p-3 rounded font-bold text-xs border-b-4 border-slate-900 active:border-b-0 active:translate-y-1 select-none"
                 >
                     BET +
