@@ -15,3 +15,10 @@ The React Compiler is not enabled on this template because of its impact on dev 
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
 # NeonCherryMaster
+
+## Asset attribution
+
+This project uses [Twemoji](https://github.com/jdecked/twemoji) (formerly Twitter Emoji) for fruit and bell icons,
+licensed under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/). Copyright 2020 Twitter, Inc and other contributors.
+
+BAR / 7 / 777 symbols are original CSS/SVG assets in this repository.
