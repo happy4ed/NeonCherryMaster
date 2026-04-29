@@ -995,6 +995,10 @@ export default function App() {
       </div>
 
       {showPaytable && <PaytableModal onClose={() => setShowPaytable(false)} />}
+
+      <div className="fixed bottom-2 right-2 z-[60] pointer-events-none select-none text-[10px] font-mono text-cyan-300/70 bg-black/40 backdrop-blur-sm px-2 py-1 rounded border border-cyan-500/20 shadow-[0_0_10px_rgba(56,189,248,0.2)]">
+        v{__APP_VERSION__} · {__BUILD_TIME__.slice(0, 16).replace('T', ' ')}
+      </div>
     </div>
   );
 }
