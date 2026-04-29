@@ -1,150 +1,41 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  Cherry, 
-  Bell, 
-  Banana, 
-  Diamond, 
+import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  Cherry,
+  Bell,
   Volume2,
   VolumeX,
   Info,
-  CircleDashed, 
   DollarSign,
   ChevronsUp,
   Minus,
   ArrowBigUp,
   ArrowBigDown,
   HandCoins,
-  Ghost,
-  Sparkles
+  Sparkles,
 } from 'lucide-react';
+import { BarIcon } from './components/icons.jsx';
+import LongPressButton from './components/LongPressButton.jsx';
+import WinLinesOverlay from './components/WinLinesOverlay.jsx';
+import PlayingCard from './components/PlayingCard.jsx';
+import PaytableModal from './components/PaytableModal.jsx';
+import CoinRain from './components/CoinRain.jsx';
+import {
+  SYMBOLS,
+  BONUS_TARGETS,
+  INITIAL_CREDITS,
+  INITIAL_JACKPOT,
+  MAX_BET,
+  SPIN_DURATION,
+  BONUS_SPINS_COUNT,
+  STORAGE_KEYS,
+  WIN_LINES,
+  isBar,
+  isSeven,
+  isFruit,
+  loadJackpot,
+  loadStats,
+} from './gameConfig.jsx';
 
-// --- 커스텀 아이콘 컴포넌트 ---
-
-const WatermelonIcon = () => (
-  <div className="relative flex items-center justify-center w-full h-full drop-shadow-md scale-110">
-    <div className="w-10 h-10 bg-green-900 border-2 border-green-600 rounded-full shadow-[0_0_15px_rgba(21,128,61,0.8)] overflow-hidden relative">
-        <div className="absolute left-2 top-0 bottom-0 w-1 bg-black/60 transform -skew-x-12 blur-[1px]"></div>
-        <div className="absolute left-5 top-0 bottom-0 w-1.5 bg-black/60 transform skew-x-6 blur-[1px]"></div>
-        <div className="absolute right-2 top-0 bottom-0 w-1 bg-black/60 transform -skew-x-12 blur-[1px]"></div>
-    </div>
-    <div className="absolute top-2 right-3 w-2 h-2 bg-white/20 rounded-full blur-sm"></div>
-  </div>
-);
-
-const StrawberryIcon = () => (
-  <div className="relative flex items-center justify-center w-full h-full drop-shadow-md scale-110">
-    <div className="w-9 h-10 bg-red-600 rounded-b-3xl rounded-t-xl border-2 border-red-400 shadow-[0_0_15px_rgba(220,38,38,0.8)] relative flex justify-center">
-        <div className="absolute top-3 left-2 w-0.5 h-1 bg-yellow-200/80 rounded-full"></div>
-        <div className="absolute top-3 right-2 w-0.5 h-1 bg-yellow-200/80 rounded-full"></div>
-        <div className="absolute top-5 left-3 w-0.5 h-1 bg-yellow-200/80 rounded-full"></div>
-        <div className="absolute top-5 right-3 w-0.5 h-1 bg-yellow-200/80 rounded-full"></div>
-        <div className="absolute bottom-3 w-0.5 h-1 bg-yellow-200/80 rounded-full"></div>
-    </div>
-    <div className="absolute -top-1 w-10 h-4 flex justify-center">
-        <div className="w-3 h-3 bg-green-500 rotate-45 transform -translate-x-1 border border-green-300 shadow-[0_0_5px_rgba(34,197,94,0.8)] rounded-sm"></div>
-        <div className="w-3 h-3 bg-green-500 rotate-45 transform translate-x-1 border border-green-300 shadow-[0_0_5px_rgba(34,197,94,0.8)] rounded-sm"></div>
-        <div className="w-3 h-3 bg-green-500 rotate-45 transform -translate-y-1 border border-green-300 shadow-[0_0_5px_rgba(34,197,94,0.8)] rounded-sm z-10"></div>
-    </div>
-  </div>
-);
-
-const OrangeIcon = () => (
-  <div className="relative flex items-center justify-center w-full h-full drop-shadow-md scale-110">
-    <div className="w-10 h-10 bg-transparent border-4 border-orange-400 rounded-full shadow-[0_0_10px_rgba(251,146,60,0.8)]"></div>
-    <div className="absolute inset-2 bg-orange-500/20 border-2 border-yellow-400 rounded-full shadow-[inset_0_0_8px_rgba(250,204,21,0.8)]"></div>
-    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1.5 h-1 bg-green-500 rounded-t-full shadow-[0_0_5px_rgba(34,197,94,0.8)]"></div>
-  </div>
-);
-
-const BarIcon = ({ count, color }) => {
-  let bgClass = "bg-gray-300";
-  let borderClass = "border-gray-500";
-  
-  const safeColor = color || '';
-
-  if (safeColor.includes("cyan")) {
-      bgClass = "bg-cyan-300";
-      borderClass = "border-cyan-600";
-  } else if (safeColor.includes("green")) {
-      bgClass = "bg-green-300";
-      borderClass = "border-green-600";
-  } else if (safeColor.includes("yellow")) {
-      bgClass = "bg-yellow-300";
-      borderClass = "border-yellow-600";
-  }
-
-  return (
-    <div className={`relative w-16 h-11 ${bgClass} border-b-4 border-r-4 ${borderClass} flex items-center justify-center shadow-md overflow-hidden rounded-sm`}>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-2xl font-black text-black/80 tracking-[0.2em] scale-x-110 transform">BAR</span>
-      </div>
-      <span 
-        className="relative z-10 text-5xl font-black text-red-600 font-serif leading-none transform -translate-y-1"
-        style={{ 
-            textShadow: '2px 2px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 3px 3px 0 rgba(0,0,0,0.3)'
-        }}
-      >
-        {count}
-      </span>
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cGF0aCBkPSJNLTEsMSBsMiwtMiBNMCw0IGw0LC00IE0zLDUgbDIsLTIiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIwLjUiIG9wYWNpdHk9IjAuMSIvPjwvc3ZnPg==')] opacity-30 pointer-events-none"></div>
-    </div>
-  );
-};
-
-const SevenThreeIcon = () => (
-    <div className="relative flex items-center justify-center w-full h-full">
-        <span className="absolute text-3xl font-black text-red-600 font-serif drop-shadow-md transform -translate-x-3 -translate-y-1 -rotate-12 z-0">7</span>
-        <span className="absolute text-3xl font-black text-red-600 font-serif drop-shadow-md transform z-10">7</span>
-        <span className="absolute text-3xl font-black text-red-600 font-serif drop-shadow-md transform translate-x-3 translate-y-1 rotate-12 z-20">7</span>
-    </div>
-);
-
-const SevenIcon = () => (
-    <span className="font-bold text-4xl text-blue-500 shadow-blue-500/50 drop-shadow-lg font-serif">7</span>
-);
-
-// --- 게임 설정 ---
-
-const SYMBOLS = [
-  { id: 'cherry', icon: Cherry, color: 'text-red-500', value: 10, weight: 50 }, 
-  { id: 'watermelon', icon: WatermelonIcon, color: 'text-green-800', value: 10, weight: 90 },
-  { id: 'orange', icon: OrangeIcon, color: 'text-orange-500', value: 10, weight: 80 }, 
-  { id: 'bell', icon: Bell, color: 'text-yellow-500', value: 18, weight: 30 }, 
-  { id: 'bar1', icon: (props) => <BarIcon count={1} color="text-cyan-400" {...props} />, color: 'text-cyan-400', value: 30, weight: 25 }, 
-  { id: 'bar2', icon: (props) => <BarIcon count={2} color="text-green-400" {...props} />, color: 'text-green-400', value: 50, weight: 15 }, 
-  { id: 'bar3', icon: (props) => <BarIcon count={3} color="text-yellow-400" {...props} />, color: 'text-yellow-400', value: 100, weight: 10 }, 
-  { id: 'seven', icon: SevenIcon, color: 'text-blue-500', value: 200, weight: 5 }, 
-  { id: 'seven3', icon: SevenThreeIcon, color: 'text-red-600', value: 400, weight: 2 }, 
-  { id: 'strawberry', icon: StrawberryIcon, color: 'text-red-600', value: 20, weight: 1 }, 
-  { id: 'empty', icon: (props) => <CircleDashed {...props} className="text-slate-800 opacity-20" />, color: 'text-slate-700', value: 0, weight: 0 },
-  // Note: 'lemon' ID is used for Banana icon in original code, keeping consistent or renaming if needed.
-  // For Fruit Check: cherry, watermelon, orange, strawberry, lemon(banana) are fruits.
-  { id: 'lemon', icon: Banana, color: 'text-yellow-400', value: 10, weight: 50 }, 
-];
-
-const BONUS_TARGETS = {
-  CHERRY_TOTAL: 12, 
-  BELL_3: 7,
-  BAR1_3: 1
-};
-
-const INITIAL_CREDITS = 3000;
-const INITIAL_JACKPOT = 0; 
-const MAX_BET = 64; 
-const SPIN_DURATION = 1500;
-const BONUS_SPINS_COUNT = 5;
-
-// 8 Winning Lines
-const WIN_LINES = [
-  [3, 4, 5], // Line 1: Mid H
-  [0, 1, 2], // Line 2: Top H
-  [6, 7, 8], // Line 3: Bot H
-  [0, 4, 8], // Line 4: Diag TL-BR
-  [6, 4, 2], // Line 5: Diag BL-TR (7-5-3)
-  [0, 3, 6], // Line 6: Left V
-  [1, 4, 7], // Line 7: Center V
-  [2, 5, 8], // Line 8: Right V
-];
 
 // --- CSS Animations ---
 const globalStyles = `
@@ -183,57 +74,98 @@ const globalStyles = `
   .custom-scrollbar::-webkit-scrollbar { width: 4px; }
   .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
   .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
+  /* Reel spin (vertical streak) */
+  .animate-reel-spin {
+    animation: reelSpin 0.18s linear infinite;
+    filter: blur(2px);
+  }
+  @keyframes reelSpin {
+    0%   { transform: translateY(-18px) scaleY(1.05); }
+    50%  { transform: translateY(0) scaleY(0.95); }
+    100% { transform: translateY(18px) scaleY(1.05); }
+  }
+
+  /* Idle gentle pulse */
+  .animate-idle-glow {
+    animation: idleGlow 2.6s ease-in-out infinite;
+  }
+  @keyframes idleGlow {
+    0%, 100% { filter: brightness(1) drop-shadow(0 0 0 transparent); }
+    50%      { filter: brightness(1.12) drop-shadow(0 0 6px rgba(255,255,255,0.45)); }
+  }
+
+  /* Win symbol bounce */
+  .animate-win-bounce {
+    animation: winBounce 0.6s ease-in-out infinite;
+    transform-origin: center;
+  }
+  @keyframes winBounce {
+    0%, 100% { transform: scale(1) rotate(0deg); }
+    50%      { transform: scale(1.18) rotate(-3deg); }
+  }
+
+  /* Coin rain */
+  @keyframes coinFall {
+    0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity: 1; }
+    90%  { opacity: 1; }
+    100% { transform: translateY(110vh) translateX(var(--drift, 0px)) rotate(360deg); opacity: 0.6; }
+  }
+  @keyframes coinSpin {
+    0%   { transform: rotateY(0deg) scaleX(1); }
+    50%  { transform: rotateY(180deg) scaleX(0.4); }
+    100% { transform: rotateY(360deg) scaleX(1); }
+  }
+
+  /* Modal fade-in */
+  .animate-fade-in { animation: fadeIn 0.25s ease-out; }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* Card reveal */
+  .animate-card-reveal { animation: cardReveal 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  @keyframes cardReveal {
+    0%   { opacity: 0; transform: scale(0.4) rotate(-12deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0); }
+  }
+
+  /* Jackpot shimmer text */
+  .animate-jackpot-shimmer {
+    background: linear-gradient(90deg, #fde68a 0%, #fff 25%, #fbbf24 50%, #fff 75%, #fde68a 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: jackpotShimmer 2.4s linear infinite;
+  }
+  @keyframes jackpotShimmer {
+    0%   { background-position: 0% center; }
+    100% { background-position: 200% center; }
+  }
+
+  /* Ambient grid pulse for board */
+  .animate-board-glow {
+    animation: boardGlow 3.2s ease-in-out infinite;
+  }
+  @keyframes boardGlow {
+    0%, 100% { box-shadow: 0 0 20px rgba(56,189,248,0.18) inset, 0 0 0 transparent; }
+    50%      { box-shadow: 0 0 40px rgba(56,189,248,0.32) inset, 0 0 16px rgba(56,189,248,0.25); }
+  }
 `;
-
-// 롱 프레스 버튼 컴포넌트
-const LongPressButton = ({ onClick, onLongPress, children, disabled, className }) => {
-    const timerRef = useRef(null);
-    const isLongPress = useRef(false);
-
-    const startPress = () => {
-        if (disabled) return;
-        isLongPress.current = false;
-        timerRef.current = setTimeout(() => {
-            isLongPress.current = true;
-            if (onLongPress) onLongPress();
-        }, 500); 
-    };
-
-    const endPress = () => {
-        if (timerRef.current) {
-            clearTimeout(timerRef.current);
-            timerRef.current = null;
-        }
-        if (!isLongPress.current && !disabled) {
-            if (onClick) onClick();
-        }
-    };
-
-    return (
-        <button
-            onMouseDown={startPress}
-            onMouseUp={endPress}
-            onMouseLeave={endPress}
-            onTouchStart={startPress}
-            onTouchEnd={(e) => { if (e.cancelable) e.preventDefault(); endPress(); }} 
-            disabled={disabled}
-            className={`${className} touch-manipulation`} 
-        >
-            {children}
-        </button>
-    );
-};
 
 export default function App() {
   const [credits, setCredits] = useState(INITIAL_CREDITS);
-  const [jackpotPool, setJackpotPool] = useState(INITIAL_JACKPOT);
+  const [jackpotPool, setJackpotPool] = useState(loadJackpot);
   const [bet, setBet] = useState(8);
   const [lastWin, setLastWin] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const [grid, setGrid] = useState(Array(9).fill(0).map(() => Math.floor(Math.random() * (SYMBOLS.length - 1)))); 
   const [winningLines, setWinningLines] = useState([]); 
-  const [centerBonus, setCenterBonus] = useState(false); 
+  const [centerBonus, setCenterBonus] = useState(false);
   const [message, setMessage] = useState("INSERT COIN");
+  const [coinRainActive, setCoinRainActive] = useState(false);
   const [autoSpin, setAutoSpin] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [showPaytable, setShowPaytable] = useState(false);
@@ -253,13 +185,59 @@ export default function App() {
   const [cheatSequence, setCheatSequence] = useState([]); 
   const [celebrationActive, setCelebrationActive] = useState(false); 
 
-  const [stats, setStats] = useState({ spins: 0, wins: 0, largestWin: 0, jackpotCount: 0 });
+  const [stats, setStats] = useState(loadStats);
 
   const animationRef = useRef(null);
-  const bettingIntervalRef = useRef(null); 
+  const bettingIntervalRef = useRef(null);
+  const audioCtxRef = useRef(null);
 
   const playSound = useCallback((type) => {
     if (!soundEnabled) return;
+    try {
+      if (!audioCtxRef.current) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        audioCtxRef.current = new Ctx();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') ctx.resume();
+
+      const beep = (freq, duration, wave = 'sine', volume = 0.08, delay = 0) => {
+        const t0 = ctx.currentTime + delay;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = wave;
+        osc.frequency.setValueAtTime(freq, t0);
+        gain.gain.setValueAtTime(volume, t0);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + duration);
+      };
+
+      switch (type) {
+        case 'spin':
+          beep(180, 0.08, 'square', 0.04);
+          break;
+        case 'win':
+          beep(523, 0.12, 'sine', 0.09, 0);
+          beep(659, 0.12, 'sine', 0.09, 0.1);
+          beep(784, 0.2, 'sine', 0.09, 0.2);
+          break;
+        case 'jackpot':
+          [523, 659, 784, 988, 1175].forEach((f, i) => beep(f, 0.15, 'square', 0.07, i * 0.08));
+          break;
+        case 'coins':
+          beep(880, 0.05, 'square', 0.06, 0);
+          beep(1320, 0.05, 'square', 0.05, 0.05);
+          break;
+        default:
+          break;
+      }
+    } catch {
+      // AudioContext may not be available; silently ignore.
+    }
   }, [soundEnabled]);
 
   const increaseBet = useCallback(() => {
@@ -339,12 +317,6 @@ export default function App() {
     if (!isHit) return SYMBOLS.findIndex(s => s.id === 'empty');
     return SYMBOLS.findIndex(s => s.id === targetId);
   };
-
-  const isBar = (id) => ['bar1', 'bar2', 'bar3'].includes(id);
-  const isSeven = (id) => ['seven', 'seven3'].includes(id);
-
-  // [NEW] Helper to check if a symbol is a fruit
-  const isFruit = (id) => ['cherry', 'watermelon', 'orange', 'strawberry', 'lemon'].includes(id);
 
   const checkWin = (finalGrid, isBonusRound) => {
     let totalWin = 0;
@@ -665,12 +637,16 @@ export default function App() {
                 setCredits(prev => prev + finalWin);
                 setLastWin(finalWin);
                 setMessage(`GRAND JACKPOT! ${jackpotPool.toLocaleString()}`);
-                setJackpotPool(INITIAL_JACKPOT); 
+                setJackpotPool(INITIAL_JACKPOT);
                 playSound('jackpot');
-            } else if (isAllFruits) { // Should be caught above, but for safety
+                setCoinRainActive(true);
+                setTimeout(() => setCoinRainActive(false), 4000);
+            } else if (isAllFruits) {
                 setCredits(prev => prev + finalWin);
                 setLastWin(finalWin);
                 setMessage("★ ALL FRUITS JACKPOT ★");
+                setCoinRainActive(true);
+                setTimeout(() => setCoinRainActive(false), 3000);
                 playSound('jackpot');
             } else {
                 if (!autoSpin && !bonusMode) {
@@ -727,6 +703,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEYS.JACKPOT, String(jackpotPool)); } catch { /* ignore quota */ }
+  }, [jackpotPool]);
+
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(stats)); } catch { /* ignore quota */ }
+  }, [stats]);
+
+  useEffect(() => {
     if (autoSpin && !isSpinning && !bonusMode && credits >= bet && !doubleUpActive) {
       const timer = setTimeout(spin, 2000);
       return () => clearTimeout(timer);
@@ -746,68 +730,12 @@ export default function App() {
     );
   };
 
-  const getPaytableRows = () => {
-    const specialRows = [
-        { id: 'seven3', icon: SevenThreeIcon, color: 'text-red-600', label: '777', payout: 400 },
-        { id: 'seven', icon: SevenIcon, color: 'text-blue-500', label: '7', payout: 200 },
-        { id: 'mixed7', icon: null, color: 'text-purple-400', label: 'Mixed 7s', payout: 100, note: 'Any 7+777' },
-        { id: 'bar3', icon: (props) => <BarIcon count={3} color="text-yellow-400" {...props} />, color: 'text-yellow-400', label: '3-BAR', payout: 100 },
-        { id: 'bar2', icon: (props) => <BarIcon count={2} color="text-green-400" {...props} />, color: 'text-green-400', label: '2-BAR', payout: 50 },
-        { id: 'bar1', icon: (props) => <BarIcon count={1} color="text-cyan-400" {...props} />, color: 'text-cyan-400', label: '1-BAR', payout: 30 },
-        { id: 'strawberry', icon: StrawberryIcon, color: 'text-red-600', label: 'Strawberry', payout: 20 },
-        { id: 'bell', icon: Bell, color: 'text-yellow-500', label: 'Bell', payout: 18 },
-        { id: 'cherry3', icon: Cherry, color: 'text-red-500', label: 'Cherry x3', payout: 10 },
-        { id: 'watermelon', icon: WatermelonIcon, color: 'text-green-800', label: 'Watermelon', payout: 10 },
-        { id: 'orange', icon: OrangeIcon, color: 'text-orange-500', label: 'Orange', payout: 10 },
-        { id: 'anybar', icon: null, color: 'text-slate-300', label: 'Any Bar', payout: 10, note: 'Mixed Bars' },
-        { id: 'cherry2', icon: Cherry, color: 'text-red-500', label: 'Cherry x2', payout: 5, note: 'Front 2' },
-        { id: 'cherry1', icon: Cherry, color: 'text-red-500', label: 'Cherry x1', payout: 2, note: 'Front 1' },
-    ];
-    return specialRows;
-  };
-
-  const PlayingCard = ({ value, revealed, result }) => {
-      const getCardContent = (val) => {
-          if (!val) return "?";
-          if (val === 1) return "A";
-          if (val === 11) return "J";
-          if (val === 12) return "Q";
-          if (val === 13) return "K";
-          return val;
-      };
-
-      return (
-          <div className={`relative w-32 h-48 bg-white rounded-xl border-4 border-slate-300 shadow-2xl flex items-center justify-center transform transition-transform duration-500 ${revealed ? 'rotate-y-0' : 'rotate-y-180'}`}>
-              {revealed ? (
-                  <div className="flex flex-col items-center">
-                      <span className={`text-6xl font-black ${value === 7 ? 'text-green-600' : (value > 7 ? 'text-red-600' : 'text-blue-600')}`}>
-                          {getCardContent(value)}
-                      </span>
-                      <span className="text-xs font-bold mt-2 text-slate-400">
-                          {value === 7 ? "HOUSE" : (value > 7 ? "HIGH" : "LOW")}
-                      </span>
-                  </div>
-              ) : (
-                  <div className="w-full h-full bg-slate-800 rounded-lg flex items-center justify-center">
-                      <span className="text-4xl text-slate-600">?</span>
-                  </div>
-              )}
-              
-              {revealed && result && (
-                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 rounded-lg backdrop-blur-[1px] animate-in zoom-in">
-                      <span className={`text-3xl font-black uppercase tracking-widest border-4 px-2 py-1 transform -rotate-12 shadow-lg ${result === 'WIN' ? 'text-green-400 border-green-400 bg-green-900/80' : 'text-red-500 border-red-500 bg-red-900/80'}`}>
-                          {result}
-                      </span>
-                  </div>
-              )}
-          </div>
-      );
-  };
-
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center p-2 font-sans select-none transition-colors duration-1000 ${bonusMode ? (bonusType === 'BAR' ? 'bg-slate-900' : 'bg-red-950') : 'bg-neutral-900'}`}>
       <style>{globalStyles}</style>
-      
+
+      {coinRainActive && <CoinRain count={50} />}
+
       {celebrationActive && (
           <div className="fixed inset-0 z-[100] pointer-events-none flex items-center justify-center">
               <div className="absolute inset-0 animate-celebration opacity-50 mix-blend-overlay"></div>
@@ -890,7 +818,7 @@ export default function App() {
                 <DollarSign size={24} className="animate-spin-slow" />
                 <span className="font-black text-xl italic tracking-wider">GRAND JACKPOT</span>
             </div>
-            <div className="font-mono font-bold text-3xl drop-shadow-[0_0_10px_rgba(234,179,8,0.8)]">
+            <div className="font-mono font-bold text-3xl drop-shadow-[0_0_10px_rgba(234,179,8,0.8)] animate-jackpot-shimmer">
                 {jackpotPool.toLocaleString()}
             </div>
         </div>
@@ -949,7 +877,14 @@ export default function App() {
         </div>
 
         <div className="flex-1 flex flex-col relative">
-            <div className={`flex justify-between items-center mb-4 p-3 rounded-lg border transition-colors duration-500 bg-black/60 border-slate-600/50`}>
+            <div className={`flex justify-between items-center mb-4 p-3 rounded-lg border transition-colors duration-500 bg-black/60 border-slate-600/50 relative`}>
+                <button
+                    onClick={() => setSoundEnabled(s => !s)}
+                    className="absolute top-1 right-1 p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-700/60 transition-colors"
+                    title={soundEnabled ? 'Mute' : 'Unmute'}
+                >
+                    {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                </button>
                 <div>
                     <div className="text-[10px] text-slate-400 font-bold tracking-widest">CREDITS</div>
                     <div className="text-2xl text-cyan-400 font-mono font-bold leading-none">{credits.toLocaleString()}</div>
@@ -1000,10 +935,14 @@ export default function App() {
                                 ? 'animate-win-flash bg-white border-white' 
                                 : '';
 
+                            const symbolMotionClass = isSpinning
+                                ? 'animate-reel-spin opacity-80'
+                                : (isWinCell ? 'animate-win-bounce' : (isEmpty ? '' : 'animate-idle-glow'));
+
                             return (
-                                <div key={i} className={`aspect-square rounded-md flex items-center justify-center relative border-2 transition-all duration-300 ${cellBg} border-slate-400 ${winAnimationClass}`}>
-                                    <div className={`transform transition-all duration-100 ${isSpinning ? 'blur-[2px] scale-90 translate-y-4 opacity-70' : 'scale-100 translate-y-0 opacity-100'}`}>
-                                        {typeof SymbolIcon === 'function' ? <SymbolIcon size={44} className={SymbolObj.color} /> : <SymbolIcon size={44} className={SymbolObj.color} />}
+                                <div key={i} className={`aspect-square rounded-md flex items-center justify-center relative border-2 transition-all duration-300 ${cellBg} border-slate-400 ${winAnimationClass}`} style={{ animationDelay: `${i * 60}ms` }}>
+                                    <div className={`transform transition-transform duration-150 ${symbolMotionClass}`}>
+                                        <SymbolIcon size={44} className={SymbolObj.color} />
                                     </div>
                                 </div>
                             );
@@ -1013,13 +952,11 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-4 gap-2 mt-auto">
-                <LongPressButton 
-                    onClick={decreaseBet} 
+                <LongPressButton
+                    onClick={decreaseBet}
                     onLongPress={startRapidDecrease}
-                    onMouseUp={stopRapidBet}
-                    onMouseLeave={stopRapidBet}
-                    onTouchEnd={stopRapidBet}
-                    disabled={isSpinning || bonusMode || bet === 0 || doubleUpActive} 
+                    onLongPressEnd={stopRapidBet}
+                    disabled={isSpinning || bonusMode || bet === 0 || doubleUpActive}
                     className="bg-slate-700 text-white p-3 rounded font-bold text-xs border-b-4 border-slate-900 active:border-b-0 active:translate-y-1 select-none flex flex-col items-center justify-center leading-none"
                 >
                     <Minus size={16} className="mb-1"/>
@@ -1031,13 +968,11 @@ export default function App() {
                     <span className="text-xl font-mono font-bold">{bet}</span>
                 </div>
                 
-                <LongPressButton 
-                    onClick={increaseBet} 
-                    onLongPress={startRapidIncrease} 
-                    onMouseUp={stopRapidBet}
-                    onMouseLeave={stopRapidBet}
-                    onTouchEnd={stopRapidBet}
-                    disabled={isSpinning || bonusMode || bet >= MAX_BET || doubleUpActive} 
+                <LongPressButton
+                    onClick={increaseBet}
+                    onLongPress={startRapidIncrease}
+                    onLongPressEnd={stopRapidBet}
+                    disabled={isSpinning || bonusMode || bet >= MAX_BET || doubleUpActive}
                     className="bg-slate-700 text-white p-3 rounded font-bold text-xs border-b-4 border-slate-900 active:border-b-0 active:translate-y-1 select-none"
                 >
                     BET +
@@ -1059,65 +994,11 @@ export default function App() {
         </div>
       </div>
 
-       {showPaytable && (
-        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4" onClick={() => setShowPaytable(false)}>
-          <div className="bg-slate-800 p-6 rounded-2xl max-w-sm w-full border border-slate-500" onClick={e => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-white mb-4 border-b border-slate-600 pb-2">Paytable (x Line Bet)</h2>
-            <div className="space-y-2 text-sm max-h-[60vh] overflow-y-auto custom-scrollbar">
-                {getPaytableRows().map((row, idx) => (
-                    <div key={idx} className={`grid grid-cols-12 items-center p-2 rounded ${idx % 2 === 0 ? 'bg-slate-700/30' : 'bg-slate-700/10'}`}>
-                         <div className="col-span-3 flex justify-center">
-                            {row.icon ? (
-                                typeof row.icon === 'function' ? 
-                                    <row.icon size={24} className={row.color} count={row.label.includes('3-BAR')?3:row.label.includes('2-BAR')?2:1} color={row.color} /> 
-                                    : <row.icon size={24} className={row.color} />
-                            ) : (
-                                <span className={`font-bold text-xs ${row.color}`}>MIXED</span>
-                            )}
-                         </div>
-                         <div className="col-span-6 text-left pl-2">
-                             <div className={`font-bold text-sm ${row.color}`}>{row.label}</div>
-                             {row.note && <div className="text-[10px] text-slate-400">{row.note}</div>}
-                         </div>
-                         <div className="col-span-3 text-right font-mono text-yellow-400 font-bold text-sm">x{row.payout}</div>
-                    </div>
-                ))}
-            </div>
-            <div className="mt-4 p-3 bg-cyan-900/30 border border-cyan-500/30 rounded text-xs text-cyan-200">
-                <p className="font-bold mb-1">UPDATES:</p>
-                <ul className="list-disc pl-4 space-y-1">
-                    <li><strong>All Fruits:</strong> ANY 9 Fruits = JACKPOT!</li>
-                    <li><strong>Double Up:</strong> Gamble your winnings!</li>
-                </ul>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      <style>{globalStyles}</style>
-    </div>
-  );
-}
+      {showPaytable && <PaytableModal onClose={() => setShowPaytable(false)} />}
 
-function WinLinesOverlay({ activeLines, color = "red" }) {
-  if (activeLines.length === 0) return null;
-  return (
-    <div className="absolute inset-0 pointer-events-none z-20">
-      <svg className="w-full h-full opacity-80" viewBox="0 0 100 100" preserveAspectRatio="none">
-        {activeLines.map(lineIdx => {
-          let d = "";
-          if (lineIdx === 0) d = "M0,50 H100";        
-          else if (lineIdx === 1) d = "M0,16.66 H100"; 
-          else if (lineIdx === 2) d = "M0,83.33 H100"; 
-          else if (lineIdx === 3) d = "M0,0 L100,100"; 
-          else if (lineIdx === 4) d = "M0,100 L100,0"; 
-          else if (lineIdx === 5) d = "M16.66,0 V100"; 
-          else if (lineIdx === 6) d = "M50,0 V100";    
-          else if (lineIdx === 7) d = "M83.33,0 V100"; 
-          
-          return <path key={lineIdx} d={d} stroke={color} strokeWidth="1" fill="none" className={`drop-shadow-[0_0_8px_${color}] animate-pulse`} />;
-        })}
-      </svg>
+      <div className="fixed bottom-2 right-2 z-[60] pointer-events-none select-none text-[10px] font-mono text-cyan-300/70 bg-black/40 backdrop-blur-sm px-2 py-1 rounded border border-cyan-500/20 shadow-[0_0_10px_rgba(56,189,248,0.2)]">
+        v{__APP_VERSION__} · {__BUILD_TIME__.slice(0, 16).replace('T', ' ')}
+      </div>
     </div>
   );
 }
